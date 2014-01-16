@@ -35,12 +35,15 @@ Schema.prototype.extend = function(obj, options) {
     discriminatorField[key] = { type : String };
     newSchema.add(discriminatorField);
 
+    var valueConverter = newSchema.options.discriminatorKeyMapper  
     // When new documents are saved, include the model name in the discriminatorField
     // if it is not set already.
     newSchema.pre('save', function(next) {
       if(this[key] === null || this[key] === undefined) {
         this[key] = this.constructor.modelName;
       }
+      if(valueConverter && valueConverter.toValue)
+        this[key] = valueConverter.toValue(this[key]) 
       next();
     });
   }
@@ -54,11 +57,12 @@ Schema.prototype.extend = function(obj, options) {
 var oldInit = Model.prototype.init;
 Model.prototype.init = function(doc, query, fn) {
   var key = this.schema.options['discriminatorKey'];
+  var modelTypeMapper = this.schema.options['discriminatorKeyMapper'];
   if(key) {
-
     // If the discriminatorField contains a model name, we set the documents prototype to that model
     var type = doc[key];
     if(type) {
+      type = modelTypeMapper && modelTypeMapper.toModel ? modelTypeMapper.toModel(type): type;
       // this will throw exception if the model isn't registered
       var model = this.db.model(type);
       var newFn = function() {
